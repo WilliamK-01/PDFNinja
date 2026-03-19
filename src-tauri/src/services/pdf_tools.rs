@@ -2,6 +2,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+use crate::services::conversion_service::ConversionService;
 use crate::shared_types::{
     PageOperationRequest, PageOperationType, QuickToolJobRequest, QuickToolType,
 };
@@ -41,7 +42,17 @@ pub fn run_tool(request: &QuickToolJobRequest) -> Result<PdfToolResult, PdfToolE
             &request.options,
         ),
         QuickToolType::CompressPdf => compress_pdf(&request.source_paths, &request.output_path),
-        QuickToolType::ImageToPdf => image_to_pdf(&request.source_paths, &request.output_path),
+        QuickToolType::ImageToPdf
+        | QuickToolType::PdfToImages
+        | QuickToolType::PdfToText
+        | QuickToolType::DocumentToPdf
+        | QuickToolType::PdfToWord
+        | QuickToolType::PdfToExcel => ConversionService::run_conversion(
+            &request.tool,
+            &request.source_paths,
+            &request.output_path,
+            &request.options,
+        ),
         QuickToolType::OcrPdf => Err(PdfToolError::NotImplemented(
             "OCR uses the dedicated ocr_service pipeline".to_string(),
         )),
@@ -214,21 +225,6 @@ fn compress_pdf(source_paths: &[String], output_path: &str) -> Result<PdfToolRes
 
     Err(PdfToolError::NotImplemented(
         "TODO(pdf-core): integrate content-stream compression backend".to_string(),
-    ))
-}
-
-fn image_to_pdf(source_paths: &[String], output_path: &str) -> Result<PdfToolResult, PdfToolError> {
-    if source_paths.is_empty() {
-        return Err(PdfToolError::Validation(
-            "Image to PDF requires at least one image file".to_string(),
-        ));
-    }
-
-    ensure_all_files_exist(source_paths)?;
-    ensure_output_path(output_path)?;
-
-    Err(PdfToolError::NotImplemented(
-        "TODO(pdf-core): integrate image raster decoder + PDF writer".to_string(),
     ))
 }
 

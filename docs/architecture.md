@@ -37,6 +37,15 @@
   - multi-language lists
   - uncertain text review
 
+## Conversion suite architecture (v1)
+
+- `quick_tools_service` still owns job lifecycle/progress updates and routes conversion jobs through `pdf_tools::run_tool`.
+- `pdf_tools` now delegates conversion-specific quick tools into `services/conversion_service.rs`.
+- `conversion_service` is the backend boundary for:
+  - **implemented now**: `image-to-pdf` (JPEG sources) and `pdf-to-text` (literal text extraction v1).
+  - **scaffolded with TODO boundaries**: `pdf-to-images`, `document-to-pdf`, `pdf-to-word`, `pdf-to-excel`.
+- This keeps the future heavy integrations isolated (PDF renderer, LibreOffice/Office bridge, layout reconstruction) without changing frontend contracts.
+
 ## Scalability decisions
 
 - Feature-first frontend folders to avoid page-level sprawl as modules grow.

@@ -6,6 +6,7 @@ import type { AppRoute, OpenDocument } from '@/shared/types';
 interface HomeScreenProps {
   recentFiles: OpenDocument[];
   onNavigate: (route: AppRoute) => void;
+  onOpenRecent: (doc: OpenDocument) => void;
 }
 
 const pinnedTools = [
@@ -17,7 +18,7 @@ const pinnedTools = [
   { label: 'Build Workflow', route: 'automation' as const, hint: 'Saved repeatable pipeline' }
 ];
 
-export function HomeScreen({ recentFiles, onNavigate }: HomeScreenProps): JSX.Element {
+export function HomeScreen({ recentFiles, onNavigate, onOpenRecent }: HomeScreenProps): JSX.Element {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 pb-5">
       <section className="rounded-2xl border border-border bg-panel p-6 shadow-soft">
@@ -74,14 +75,14 @@ export function HomeScreen({ recentFiles, onNavigate }: HomeScreenProps): JSX.El
               {recentFiles.slice(0, 5).map((file) => (
                 <button
                   key={file.id}
-                  onClick={() => onNavigate('editor')}
+                  onClick={() => onOpenRecent(file)}
                   className="flex w-full items-center justify-between rounded-xl border border-border bg-panelElevated px-3 py-2 text-left transition hover:border-accent/60"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-textPrimary">{file.name}</p>
                     <p className="truncate text-xs text-textSecondary">{file.path}</p>
                   </div>
-                  <span className="ml-3 text-xs text-textSecondary">{file.pageCount} pages</span>
+                  <span className="ml-3 text-xs text-textSecondary">{file.pageCount ?? '—'} pages</span>
                 </button>
               ))}
             </div>
@@ -92,11 +93,7 @@ export function HomeScreen({ recentFiles, onNavigate }: HomeScreenProps): JSX.El
           )}
         </SectionPanel>
 
-        <SectionPanel
-          title="Pinned tools"
-          subtitle="Most-used actions for high-throughput work."
-          actionLabel="Customize"
-        >
+        <SectionPanel title="Pinned tools" subtitle="Most-used actions for high-throughput work." actionLabel="Customize">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
             {pinnedTools.map((tool) => (
               <button

@@ -3,11 +3,12 @@ import { ModuleCard } from '@/components/layout/module-card';
 import { QuickToolWorkflow } from '@/features/quick-tools/quick-tool-workflow';
 import { QUICK_TOOLS, getQuickTool } from '@/features/quick-tools/tool-definitions';
 import { fetchJobs, runQuickToolJob } from '@/features/quick-tools/quick-tools-api';
+import { createDocumentFromPath } from '@/features/editor/document-open';
 import { useAppState } from '@/state/app-state';
 import type { JobItem, QuickToolType } from '@/shared/types';
 
 export function QuickToolsScreen(): JSX.Element {
-  const { state, queueJob, updateJob, setActiveTool } = useAppState();
+  const { state, queueJob, updateJob, setActiveTool, openDocument } = useAppState();
   const [activeTool, setActiveToolLocal] = useState<QuickToolType>('merge-pdfs');
 
   const currentTool = useMemo(() => getQuickTool(activeTool), [activeTool]);
@@ -46,6 +47,11 @@ export function QuickToolsScreen(): JSX.Element {
     });
   }
 
+  function handleOpenOutput(path: string): void {
+    if (!path.toLowerCase().endsWith('.pdf')) return;
+    openDocument(createDocumentFromPath(path, 'quick-tool'));
+  }
+
   return (
     <div className="space-y-4">
       <ModuleCard title="Quick Tools Dashboard" description="Express workflows for fast offline PDF utility operations.">
@@ -68,7 +74,7 @@ export function QuickToolsScreen(): JSX.Element {
         </div>
       </ModuleCard>
 
-      <QuickToolWorkflow tool={currentTool} recentResult={latestJob} onRun={handleRun} />
+      <QuickToolWorkflow tool={currentTool} recentResult={latestJob} onRun={handleRun} onOpenOutput={handleOpenOutput} />
     </div>
   );
 }

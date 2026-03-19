@@ -26,7 +26,7 @@ export function App(): JSX.Element {
   const content = useMemo(() => {
     switch (state.route) {
       case 'home':
-        return <HomeScreen />;
+        return <HomeScreen recentFiles={state.openDocuments} onNavigate={navigate} />;
       case 'quick-tools':
         return <QuickToolsScreen />;
       case 'editor':
@@ -36,9 +36,9 @@ export function App(): JSX.Element {
       case 'settings':
         return <SettingsScreen settings={state.settings} onUpdate={updateSettings} />;
       default:
-        return <HomeScreen />;
+        return <HomeScreen recentFiles={state.openDocuments} onNavigate={navigate} />;
     }
-  }, [state, updateSettings]);
+  }, [navigate, state, updateSettings]);
 
   return (
     <div className="flex h-full bg-background text-textPrimary">

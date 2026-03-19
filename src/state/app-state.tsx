@@ -64,7 +64,7 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, openDocuments, activeDocumentId };
     }
     case 'QUEUE_JOB':
-      return { ...state, jobs: [...state.jobs, action.payload], route: 'automation' };
+      return { ...state, jobs: [...state.jobs, action.payload] };
     case 'UPDATE_JOB':
       return {
         ...state,

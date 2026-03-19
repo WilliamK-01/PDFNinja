@@ -31,6 +31,22 @@ export interface AppSettings {
   scratchDirectory: string;
 }
 
+export type QuickToolType =
+  | 'merge-pdfs'
+  | 'split-pdf'
+  | 'extract-pages'
+  | 'remove-pages'
+  | 'rotate-pages'
+  | 'compress-pdf'
+  | 'image-to-pdf';
+
+export interface QuickToolJobRequest {
+  tool: QuickToolType;
+  sourcePaths: string[];
+  outputPath: string;
+  options: Record<string, unknown>;
+}
+
 export interface AppState {
   route: AppRoute;
   openDocuments: OpenDocument[];

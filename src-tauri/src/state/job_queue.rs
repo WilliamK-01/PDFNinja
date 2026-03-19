@@ -12,6 +12,12 @@ impl JobQueue {
         self.jobs.write().push(job);
     }
 
+    pub fn update(&self, job_id: &str, update: impl FnOnce(&mut JobItem)) {
+        if let Some(job) = self.jobs.write().iter_mut().find(|job| job.id == job_id) {
+            update(job);
+        }
+    }
+
     pub fn list(&self) -> Vec<JobItem> {
         self.jobs.read().clone()
     }

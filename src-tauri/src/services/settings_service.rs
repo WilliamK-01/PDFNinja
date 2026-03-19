@@ -5,7 +5,10 @@ use crate::storage::settings_store::SettingsStore;
 pub struct SettingsService;
 
 impl SettingsService {
-    pub fn update(state: &AppState, patch: AppSettings) -> Result<AppSettings, SettingsServiceError> {
+    pub fn update(
+        state: &AppState,
+        patch: AppSettings,
+    ) -> Result<AppSettings, SettingsServiceError> {
         *state.settings.write() = patch.clone();
         SettingsStore::save(&patch)?;
         Ok(patch)

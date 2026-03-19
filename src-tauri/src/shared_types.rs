@@ -35,3 +35,25 @@ pub struct JobItem {
     pub progress: u8,
     pub message: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuickToolJobRequest {
+    pub tool: QuickToolType,
+    pub source_paths: Vec<String>,
+    pub output_path: String,
+    #[serde(default)]
+    pub options: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum QuickToolType {
+    MergePdfs,
+    SplitPdf,
+    ExtractPages,
+    RemovePages,
+    RotatePages,
+    CompressPdf,
+    ImageToPdf,
+}

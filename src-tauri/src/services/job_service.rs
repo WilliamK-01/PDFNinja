@@ -6,7 +6,9 @@ pub struct JobService;
 impl JobService {
     pub fn enqueue(queue: &JobQueue, mut job: JobItem) -> Result<JobItem, JobServiceError> {
         if job.id.trim().is_empty() {
-            return Err(JobServiceError::Validation("job id is required".to_string()));
+            return Err(JobServiceError::Validation(
+                "job id is required".to_string(),
+            ));
         }
 
         job.status = "queued".to_string();

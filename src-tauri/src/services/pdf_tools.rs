@@ -42,6 +42,9 @@ pub fn run_tool(request: &QuickToolJobRequest) -> Result<PdfToolResult, PdfToolE
         ),
         QuickToolType::CompressPdf => compress_pdf(&request.source_paths, &request.output_path),
         QuickToolType::ImageToPdf => image_to_pdf(&request.source_paths, &request.output_path),
+        QuickToolType::OcrPdf => Err(PdfToolError::NotImplemented(
+            "OCR uses the dedicated ocr_service pipeline".to_string(),
+        )),
     }
 }
 

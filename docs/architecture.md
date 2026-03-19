@@ -15,6 +15,28 @@
 - `src-tauri/src/storage`: persistence adapters (`SettingsStore`) for local-only configuration.
 - `src-tauri/src/shared_types.rs`: serialized types aligned to frontend shared interfaces.
 
+## OCR pipeline (v1, offline-first)
+
+- OCR logic is separated from generic PDF operations in `src-tauri/src/services/ocr_service.rs`.
+- Entry points:
+  - Quick Tools OCR uses `run_quick_tool_job` and routes OCR jobs into `OcrService`.
+  - Editor OCR action uses dedicated `run_ocr_job`.
+- Pipeline stages tracked in job updates:
+  1. raster/page input (source validation + page count probe)
+  2. preprocessing (deskew/despeckle hooks)
+  3. OCR (native `ocrmypdf` + `tesseract`)
+  4. text layer generation
+  5. output PDF generation (atomic partial file rename)
+- Job details expose OCR summary data for UI:
+  - `pagesProcessed`
+  - `languageUsed`
+  - `confidence` (currently nullable)
+- Future hooks already modeled in request/details contracts:
+  - deskew
+  - despeckle
+  - multi-language lists
+  - uncertain text review
+
 ## Scalability decisions
 
 - Feature-first frontend folders to avoid page-level sprawl as modules grow.

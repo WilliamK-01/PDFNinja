@@ -1,7 +1,10 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use serde::Deserialize;
+
+use crate::services::ocr_service::OcrService;
 use crate::services::pdf_tools::{run_tool, PdfToolError};
-use crate::shared_types::{JobItem, QuickToolJobRequest};
+use crate::shared_types::{JobItem, OcrJobRequest, OcrPreprocessingOptions, QuickToolJobRequest, QuickToolType};
 use crate::state::job_queue::JobQueue;
 
 pub struct QuickToolsService;
@@ -11,6 +14,27 @@ impl QuickToolsService {
         queue: &JobQueue,
         request: QuickToolJobRequest,
     ) -> Result<JobItem, QuickToolsError> {
+        if matches!(request.tool, QuickToolType::OcrPdf) {
+            let options: OcrQuickToolOptions = serde_json::from_value(request.options.clone())
+                .map_err(|_| QuickToolsError::Validation("OCR requires language + preprocessing options".to_string()))?;
+            return OcrService::run_job(
+                queue,
+                OcrJobRequest {
+                    source_path: request
+                        .source_paths
+                        .first()
+                        .cloned()
+                        .unwrap_or_default(),
+                    output_path: request.output_path,
+                    language: options.language,
+                    preprocessing: options.preprocessing,
+                    languages: options.languages,
+                    review_uncertain_text: options.review_uncertain_text,
+                },
+            )
+            .map_err(QuickToolsError::Ocr);
+        }
+
         if request.source_paths.is_empty() {
             return Err(QuickToolsError::Validation(
                 "At least one source file is required".to_string(),
@@ -36,6 +60,7 @@ impl QuickToolsService {
             updated_at: now,
             progress: 0,
             message: Some("Queued".to_string()),
+            details: None,
         };
 
         queue.enqueue(job.clone());
@@ -84,6 +109,19 @@ pub enum QuickToolsError {
     Validation(String),
     #[error(transparent)]
     Tool(#[from] PdfToolError),
+    #[error(transparent)]
+    Ocr(#[from] crate::services::ocr_service::OcrServiceError),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OcrQuickToolOptions {
+    language: String,
+    preprocessing: OcrPreprocessingOptions,
+    #[serde(default)]
+    languages: Vec<String>,
+    #[serde(default)]
+    review_uncertain_text: bool,
 }
 
 fn unix_millis() -> u128 {

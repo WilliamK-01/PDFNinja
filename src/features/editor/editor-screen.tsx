@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildViewerUrl, createDocumentFromFile } from '@/features/editor/document-open';
 import { runPageOperation } from '@/features/editor/page-operations-api';
+import { runOcrJob } from '@/features/editor/ocr-api';
 import { useAppState } from '@/state/app-state';
 import type { AnnotationItem, AnnotationRect, AnnotationTool, OpenDocument, PageOperationRequest, PageOperationType } from '@/shared/types';
 
@@ -57,6 +58,10 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
   const [rotateDegrees, setRotateDegrees] = useState<90 | 180 | 270>(90);
   const [extractOutputPath, setExtractOutputPath] = useState('');
   const [operationBusy, setOperationBusy] = useState(false);
+  const [ocrLanguage, setOcrLanguage] = useState('eng');
+  const [ocrOutputPath, setOcrOutputPath] = useState('');
+  const [ocrDeskew, setOcrDeskew] = useState(true);
+  const [ocrDespeckle, setOcrDespeckle] = useState(false);
   const [thumbScrollTop, setThumbScrollTop] = useState(0);
   const [annotationTool, setAnnotationTool] = useState<AnnotationTool>('select');
   const [annotationContent, setAnnotationContent] = useState('');
@@ -81,6 +86,7 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
     setSelectedPages([active?.activePage ?? 1]);
     setLastSelectedPage(active?.activePage ?? 1);
     setExtractOutputPath(active ? buildOutputPath(active.path, 'extract') : '');
+    setOcrOutputPath(active ? buildOutputPath(active.path, 'ocr') : '');
     setDragStart(null);
     setDragRect(null);
     setDrawPoints([]);
@@ -208,6 +214,47 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown page operation failure';
+      alert(message);
+    } finally {
+      setOperationBusy(false);
+    }
+  }
+
+  async function executeOcr(): Promise<void> {
+    if (!active || operationBusy) return;
+    if (!ocrOutputPath.trim()) {
+      alert('Please provide an OCR output path.');
+      return;
+    }
+
+    setOperationBusy(true);
+    try {
+      const job = await runOcrJob({
+        sourcePath: active.path,
+        outputPath: ocrOutputPath.trim(),
+        language: ocrLanguage,
+        preprocessing: {
+          deskew: ocrDeskew,
+          despeckle: ocrDespeckle
+        },
+        languages: [ocrLanguage],
+        reviewUncertainText: false
+      });
+
+      queueJob(job);
+      updateJob(job.id, job);
+      if (job.status === 'completed') {
+        updateActive({
+          path: job.outputPath,
+          sourceUrl: undefined,
+          modifiedAt: new Date().toISOString(),
+          activePage: 1
+        });
+      } else {
+        alert(job.message ?? 'OCR failed.');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown OCR failure';
       alert(message);
     } finally {
       setOperationBusy(false);
@@ -690,6 +737,42 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
               className="mt-2 w-full rounded border border-border bg-panel px-2 py-1 disabled:opacity-50"
             >
               Extract to new PDF
+            </button>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-border bg-panel p-3 text-xs">
+            <h4 className="font-medium text-textPrimary">OCR (searchable PDF)</h4>
+            <label className="mt-2 block text-textSecondary">
+              OCR language
+              <select
+                value={ocrLanguage}
+                onChange={(event) => setOcrLanguage(event.target.value)}
+                className="mt-1 w-full rounded border border-border bg-panelElevated px-2 py-1 text-xs text-textPrimary"
+              >
+                <option value="eng">English (eng)</option>
+                <option value="spa">Spanish (spa)</option>
+              </select>
+            </label>
+            <label className="mt-2 flex items-center gap-2 text-textSecondary">
+              <input type="checkbox" checked={ocrDeskew} onChange={(event) => setOcrDeskew(event.target.checked)} />
+              Deskew pages
+            </label>
+            <label className="mt-1 flex items-center gap-2 text-textSecondary">
+              <input type="checkbox" checked={ocrDespeckle} onChange={(event) => setOcrDespeckle(event.target.checked)} />
+              Despeckle pages (hook)
+            </label>
+            <input
+              value={ocrOutputPath}
+              onChange={(event) => setOcrOutputPath(event.target.value)}
+              className="mt-2 w-full rounded border border-border bg-panelElevated px-2 py-1 text-xs text-textPrimary"
+              placeholder="/path/to/searchable.pdf"
+            />
+            <button
+              onClick={() => void executeOcr()}
+              disabled={operationBusy || !ocrOutputPath.trim()}
+              className="mt-2 w-full rounded border border-accent/70 bg-accent/20 px-2 py-1 disabled:opacity-50"
+            >
+              Run OCR
             </button>
           </div>
 

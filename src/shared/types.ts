@@ -36,6 +36,7 @@ export interface JobItem {
   updatedAt: string;
   progress: number;
   message?: string;
+  details?: Record<string, unknown>;
 }
 
 export interface AppSettings {
@@ -53,13 +54,26 @@ export type QuickToolType =
   | 'remove-pages'
   | 'rotate-pages'
   | 'compress-pdf'
-  | 'image-to-pdf';
+  | 'image-to-pdf'
+  | 'ocr-pdf';
 
 export interface QuickToolJobRequest {
   tool: QuickToolType;
   sourcePaths: string[];
   outputPath: string;
   options: Record<string, unknown>;
+}
+
+export interface OcrJobRequest {
+  sourcePath: string;
+  outputPath: string;
+  language: string;
+  preprocessing: {
+    deskew: boolean;
+    despeckle: boolean;
+  };
+  languages?: string[];
+  reviewUncertainText?: boolean;
 }
 
 export type PageOperationType = 'reorder-pages' | 'delete-pages' | 'duplicate-pages' | 'extract-pages' | 'rotate-pages';

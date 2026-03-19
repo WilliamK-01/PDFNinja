@@ -34,6 +34,8 @@ pub struct JobItem {
     pub updated_at: String,
     pub progress: u8,
     pub message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,6 +58,29 @@ pub enum QuickToolType {
     RotatePages,
     CompressPdf,
     ImageToPdf,
+    OcrPdf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrPreprocessingOptions {
+    #[serde(default)]
+    pub deskew: bool,
+    #[serde(default)]
+    pub despeckle: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrJobRequest {
+    pub source_path: String,
+    pub output_path: String,
+    pub language: String,
+    pub preprocessing: OcrPreprocessingOptions,
+    #[serde(default)]
+    pub languages: Vec<String>,
+    #[serde(default)]
+    pub review_uncertain_text: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

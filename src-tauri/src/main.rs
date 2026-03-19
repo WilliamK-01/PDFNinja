@@ -18,7 +18,8 @@ fn main() {
             commands::jobs::list_jobs,
             commands::jobs::enqueue_job,
             commands::quick_tools::run_quick_tool_job,
-            commands::page_operations::run_page_operation_job
+            commands::page_operations::run_page_operation_job,
+            commands::ocr::run_ocr_job
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

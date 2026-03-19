@@ -73,7 +73,17 @@ export const QUICK_TOOLS: QuickToolDefinition[] = [
     outputHint: 'Output PDF path for generated document.',
     optionsHelp: 'Current pipeline is scaffolded and returns a TODO status.',
     status: 'scaffolded'
+  },
+  {
+    id: 'ocr-pdf',
+    label: 'OCR PDF',
+    description: 'Convert scanned PDFs into searchable PDFs fully offline.',
+    sourceHint: 'Drop one scanned or image-based PDF file.',
+    outputHint: 'Output PDF path, e.g. /Users/me/output/scan-searchable.pdf',
+    optionsHelp: 'Select OCR language and optional preprocessing hooks (deskew/despeckle).',
+    status: 'implemented'
   }
+
 ];
 
 export function getQuickTool(toolId: QuickToolType): QuickToolDefinition {

@@ -36,6 +36,7 @@ impl PageOperationsService {
             updated_at: now,
             progress: 0,
             message: Some("Queued".to_string()),
+            details: None,
         };
 
         queue.enqueue(job.clone());

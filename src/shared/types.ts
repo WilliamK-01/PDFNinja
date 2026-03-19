@@ -1,0 +1,41 @@
+export type AppRoute = 'home' | 'quick-tools' | 'editor' | 'automation' | 'settings';
+
+export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export interface OpenDocument {
+  id: string;
+  name: string;
+  path: string;
+  pageCount: number;
+  activePage: number;
+  modifiedAt: string;
+}
+
+export interface JobItem {
+  id: string;
+  type: string;
+  sourcePaths: string[];
+  outputPath: string;
+  status: JobStatus;
+  createdAt: string;
+  updatedAt: string;
+  progress: number;
+  message?: string;
+}
+
+export interface AppSettings {
+  theme: 'dark';
+  defaultZoom: number;
+  autosaveMinutes: number;
+  recentLimit: number;
+  scratchDirectory: string;
+}
+
+export interface AppState {
+  route: AppRoute;
+  openDocuments: OpenDocument[];
+  activeDocumentId: string | null;
+  activeTool: string | null;
+  jobs: JobItem[];
+  settings: AppSettings;
+}

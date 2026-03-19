@@ -2,6 +2,7 @@ import type { QuickToolType } from '@/shared/types';
 
 export interface QuickToolDefinition {
   id: QuickToolType;
+  section: 'pdf-core' | 'conversions';
   label: string;
   description: string;
   sourceHint: string;
@@ -13,6 +14,7 @@ export interface QuickToolDefinition {
 export const QUICK_TOOLS: QuickToolDefinition[] = [
   {
     id: 'merge-pdfs',
+    section: 'pdf-core',
     label: 'Merge PDFs',
     description: 'Combine multiple PDF files into a single output document.',
     sourceHint: 'Drop two or more PDF files in the order you want them merged.',
@@ -22,6 +24,7 @@ export const QUICK_TOOLS: QuickToolDefinition[] = [
   },
   {
     id: 'split-pdf',
+    section: 'pdf-core',
     label: 'Split PDF',
     description: 'Split one PDF into per-page PDF files.',
     sourceHint: 'Drop one source PDF file.',
@@ -31,6 +34,7 @@ export const QUICK_TOOLS: QuickToolDefinition[] = [
   },
   {
     id: 'extract-pages',
+    section: 'pdf-core',
     label: 'Extract pages',
     description: 'Create a new PDF from selected pages.',
     sourceHint: 'Drop one source PDF file.',
@@ -40,6 +44,7 @@ export const QUICK_TOOLS: QuickToolDefinition[] = [
   },
   {
     id: 'remove-pages',
+    section: 'pdf-core',
     label: 'Remove pages',
     description: 'Delete selected pages from a PDF copy.',
     sourceHint: 'Drop one source PDF file.',
@@ -49,6 +54,7 @@ export const QUICK_TOOLS: QuickToolDefinition[] = [
   },
   {
     id: 'rotate-pages',
+    section: 'pdf-core',
     label: 'Rotate pages',
     description: 'Rotate chosen pages by a fixed angle.',
     sourceHint: 'Drop one source PDF file.',
@@ -58,6 +64,7 @@ export const QUICK_TOOLS: QuickToolDefinition[] = [
   },
   {
     id: 'compress-pdf',
+    section: 'pdf-core',
     label: 'Compress PDF',
     description: 'Apply PDF object compression to reduce file size.',
     sourceHint: 'Drop one source PDF file.',
@@ -67,15 +74,67 @@ export const QUICK_TOOLS: QuickToolDefinition[] = [
   },
   {
     id: 'image-to-pdf',
+    section: 'conversions',
     label: 'Image to PDF',
     description: 'Convert images into a PDF document.',
     sourceHint: 'Drop one or more image files.',
     outputHint: 'Output PDF path for generated document.',
-    optionsHelp: 'Current pipeline is scaffolded and returns a TODO status.',
+    optionsHelp: 'Implemented for JPEG now (multi-image). PNG/WebP and other formats are planned.',
+    status: 'implemented'
+  },
+  {
+    id: 'pdf-to-images',
+    section: 'conversions',
+    label: 'PDF to images',
+    description: 'Render PDF pages to image files (PNG/JPEG).',
+    sourceHint: 'Drop one source PDF file.',
+    outputHint: 'Output folder path, e.g. /Users/me/output/pdf-pages',
+    optionsHelp: 'Scaffolded with renderer boundary. Planned: Poppler/PDFium adapter.',
+    status: 'scaffolded'
+  },
+  {
+    id: 'pdf-to-text',
+    section: 'conversions',
+    label: 'PDF to text',
+    description: 'Extract text content from digital PDFs into TXT or JSON.',
+    sourceHint: 'Drop one source PDF file.',
+    outputHint: 'Output file path, e.g. /Users/me/output/notes.txt',
+    optionsHelp: 'Implemented for selectable-text PDFs. Scanned PDFs should use OCR first.',
+    status: 'implemented'
+  },
+  {
+    id: 'document-to-pdf',
+    section: 'conversions',
+    label: 'Document to PDF',
+    description: 'Architecture hook for Office-to-PDF conversion workflows.',
+    sourceHint: 'Drop one source office document, e.g. DOCX/XLSX/PPTX.',
+    outputHint: 'Output PDF file path.',
+    optionsHelp: 'Scaffolded boundary for future LibreOffice/Office bridge.',
+    status: 'scaffolded'
+  },
+  {
+    id: 'pdf-to-word',
+    section: 'conversions',
+    label: 'PDF to Word',
+    description: 'Architecture hook for high-fidelity PDF to DOCX conversion.',
+    sourceHint: 'Drop one source PDF file.',
+    outputHint: 'Output DOCX path.',
+    optionsHelp: 'Scaffolded boundary for external conversion provider.',
+    status: 'scaffolded'
+  },
+  {
+    id: 'pdf-to-excel',
+    section: 'conversions',
+    label: 'PDF to Excel',
+    description: 'Architecture hook for table extraction into XLSX.',
+    sourceHint: 'Drop one source PDF file.',
+    outputHint: 'Output XLSX path.',
+    optionsHelp: 'Scaffolded boundary for table-aware conversion backend.',
     status: 'scaffolded'
   },
   {
     id: 'ocr-pdf',
+    section: 'conversions',
     label: 'OCR PDF',
     description: 'Convert scanned PDFs into searchable PDFs fully offline.',
     sourceHint: 'Drop one scanned or image-based PDF file.',

@@ -1,3 +1,4 @@
+pub mod conversion_service;
 pub mod job_service;
 pub mod ocr_service;
 pub mod page_operations_service;

@@ -58,6 +58,11 @@ pub enum QuickToolType {
     RotatePages,
     CompressPdf,
     ImageToPdf,
+    PdfToImages,
+    PdfToText,
+    DocumentToPdf,
+    PdfToWord,
+    PdfToExcel,
     OcrPdf,
 }
 

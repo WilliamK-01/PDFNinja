@@ -55,6 +55,11 @@ export type QuickToolType =
   | 'rotate-pages'
   | 'compress-pdf'
   | 'image-to-pdf'
+  | 'pdf-to-images'
+  | 'pdf-to-text'
+  | 'document-to-pdf'
+  | 'pdf-to-word'
+  | 'pdf-to-excel'
   | 'ocr-pdf';
 
 export interface QuickToolJobRequest {

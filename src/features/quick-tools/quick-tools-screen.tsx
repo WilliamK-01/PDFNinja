@@ -55,21 +55,31 @@ export function QuickToolsScreen(): JSX.Element {
   return (
     <div className="space-y-4">
       <ModuleCard title="Quick Tools Dashboard" description="Express workflows for fast offline PDF utility operations.">
-        <div className="grid grid-cols-2 gap-3">
-          {QUICK_TOOLS.map((tool) => (
-            <button
-              key={tool.id}
-              onClick={() => setActiveToolLocal(tool.id)}
-              className={`rounded-lg border px-3 py-4 text-left text-sm transition ${
-                activeTool === tool.id
-                  ? 'border-accent bg-accent/15 text-textPrimary'
-                  : 'border-border bg-panelElevated text-textSecondary hover:border-accent/70'
-              }`}
-            >
-              <p className="font-medium text-textPrimary">{tool.label}</p>
-              <p className="mt-1 text-xs">{tool.description}</p>
-              <p className="mt-2 text-[11px] uppercase tracking-wide">{tool.status}</p>
-            </button>
+        <div className="space-y-4">
+          {[
+            { key: 'pdf-core', label: 'PDF Core Tools' },
+            { key: 'conversions', label: 'Conversions' }
+          ].map((section) => (
+            <section key={section.key} className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-textSecondary">{section.label}</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {QUICK_TOOLS.filter((tool) => tool.section === section.key).map((tool) => (
+                  <button
+                    key={tool.id}
+                    onClick={() => setActiveToolLocal(tool.id)}
+                    className={`rounded-lg border px-3 py-4 text-left text-sm transition ${
+                      activeTool === tool.id
+                        ? 'border-accent bg-accent/15 text-textPrimary'
+                        : 'border-border bg-panelElevated text-textSecondary hover:border-accent/70'
+                    }`}
+                  >
+                    <p className="font-medium text-textPrimary">{tool.label}</p>
+                    <p className="mt-1 text-xs">{tool.description}</p>
+                    <p className="mt-2 text-[11px] uppercase tracking-wide">{tool.status}</p>
+                  </button>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       </ModuleCard>

@@ -39,12 +39,27 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
   const [ocrLanguage, setOcrLanguage] = useState('eng');
   const [deskew, setDeskew] = useState(true);
   const [despeckle, setDespeckle] = useState(false);
+  const [imagePageFit, setImagePageFit] = useState<'fit' | 'fill'>('fit');
+  const [textOutputFormat, setTextOutputFormat] = useState<'txt' | 'json'>('txt');
+  const [includePageMarkers, setIncludePageMarkers] = useState(true);
+  const [imageOutputFormat, setImageOutputFormat] = useState<'png' | 'jpeg'>('png');
+  const [imageDpi, setImageDpi] = useState('144');
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
   const requiresPages = tool.id === 'extract-pages' || tool.id === 'remove-pages' || tool.id === 'rotate-pages';
   const requiresDegrees = tool.id === 'rotate-pages';
   const isOcrTool = tool.id === 'ocr-pdf';
+  const isImageToPdf = tool.id === 'image-to-pdf';
+  const isPdfToText = tool.id === 'pdf-to-text';
+  const isPdfToImages = tool.id === 'pdf-to-images';
+  const isConversionTool = tool.section === 'conversions';
+  const requiresSingleFile = !['merge-pdfs', 'image-to-pdf'].includes(tool.id);
+  const acceptedTypes = isOcrTool || isPdfToText || isPdfToImages || tool.id === 'pdf-to-word' || tool.id === 'pdf-to-excel'
+    ? 'application/pdf'
+    : isImageToPdf
+      ? 'image/jpeg,image/jpg'
+      : undefined;
 
   const options = useMemo(() => {
     if (tool.id === 'extract-pages' || tool.id === 'remove-pages') {
@@ -64,8 +79,38 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
         reviewUncertainText: false
       };
     }
+    if (tool.id === 'image-to-pdf') {
+      return {
+        imageOrdering: 'input-order',
+        pageSizing: imagePageFit
+      };
+    }
+    if (tool.id === 'pdf-to-text') {
+      return {
+        format: textOutputFormat,
+        includePageMarkers
+      };
+    }
+    if (tool.id === 'pdf-to-images') {
+      return {
+        format: imageOutputFormat,
+        dpi: Number(imageDpi) || 144
+      };
+    }
     return {};
-  }, [degrees, deskew, despeckle, ocrLanguage, pagesValue, tool.id]);
+  }, [
+    degrees,
+    deskew,
+    despeckle,
+    imageDpi,
+    imageOutputFormat,
+    imagePageFit,
+    includePageMarkers,
+    ocrLanguage,
+    pagesValue,
+    textOutputFormat,
+    tool.id
+  ]);
 
   function addFiles(list: FileList | null): void {
     if (!list?.length) return;
@@ -99,6 +144,10 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
     }
     if (isOcrTool && files.length !== 1) {
       setError('OCR currently supports exactly one source PDF per run.');
+      return;
+    }
+    if (requiresSingleFile && files.length !== 1) {
+      setError('This tool currently supports exactly one source file per run.');
       return;
     }
 
@@ -148,7 +197,7 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
           multiple={tool.id === 'merge-pdfs' || tool.id === 'image-to-pdf'}
           onChange={(event) => addFiles(event.target.files)}
           className="mt-3 block text-xs text-textSecondary"
-          accept={isOcrTool ? 'application/pdf' : undefined}
+          accept={acceptedTypes}
         />
       </div>
 
@@ -161,6 +210,11 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
 
       <div className="rounded-lg border border-border bg-panel px-4 py-3 space-y-3">
         <h4 className="text-sm font-medium text-textPrimary">Options</h4>
+        {isConversionTool ? (
+          <p className="text-xs text-textSecondary">
+            Conversion format options and output settings are shown below for this workflow.
+          </p>
+        ) : null}
         {requiresPages ? (
           <label className="block text-xs text-textSecondary">
             Page list
@@ -210,6 +264,70 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
             <label className="flex items-center gap-2 text-xs text-textSecondary">
               <input type="checkbox" checked={despeckle} onChange={(event) => setDespeckle(event.target.checked)} />
               Despeckle pages (hook enabled)
+            </label>
+          </>
+        ) : null}
+
+        {isImageToPdf ? (
+          <label className="block text-xs text-textSecondary">
+            Page sizing strategy
+            <select
+              value={imagePageFit}
+              onChange={(event) => setImagePageFit(event.target.value as 'fit' | 'fill')}
+              className="mt-1 w-full rounded border border-border bg-panelElevated px-2 py-1 text-sm text-textPrimary"
+            >
+              <option value="fit">Fit image inside page</option>
+              <option value="fill">Fill page (may crop)</option>
+            </select>
+          </label>
+        ) : null}
+
+        {isPdfToText ? (
+          <>
+            <label className="block text-xs text-textSecondary">
+              Text export format
+              <select
+                value={textOutputFormat}
+                onChange={(event) => setTextOutputFormat(event.target.value as 'txt' | 'json')}
+                className="mt-1 w-full rounded border border-border bg-panelElevated px-2 py-1 text-sm text-textPrimary"
+              >
+                <option value="txt">Plain text (.txt)</option>
+                <option value="json">Structured JSON (.json)</option>
+              </select>
+            </label>
+
+            <label className="flex items-center gap-2 text-xs text-textSecondary">
+              <input
+                type="checkbox"
+                checked={includePageMarkers}
+                onChange={(event) => setIncludePageMarkers(event.target.checked)}
+              />
+              Include page markers in output
+            </label>
+          </>
+        ) : null}
+
+        {isPdfToImages ? (
+          <>
+            <label className="block text-xs text-textSecondary">
+              Output image format
+              <select
+                value={imageOutputFormat}
+                onChange={(event) => setImageOutputFormat(event.target.value as 'png' | 'jpeg')}
+                className="mt-1 w-full rounded border border-border bg-panelElevated px-2 py-1 text-sm text-textPrimary"
+              >
+                <option value="png">PNG</option>
+                <option value="jpeg">JPEG</option>
+              </select>
+            </label>
+            <label className="block text-xs text-textSecondary">
+              Render DPI
+              <input
+                value={imageDpi}
+                onChange={(event) => setImageDpi(event.target.value)}
+                className="mt-1 w-full rounded border border-border bg-panelElevated px-2 py-1 text-sm text-textPrimary"
+                placeholder="144"
+              />
             </label>
           </>
         ) : null}

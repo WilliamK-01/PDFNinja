@@ -2,7 +2,7 @@ import type { QuickToolType } from '@/shared/types';
 
 export interface QuickToolDefinition {
   id: QuickToolType;
-  section: 'pdf-core' | 'conversions';
+  section: 'pdf-core' | 'security' | 'conversions';
   label: string;
   description: string;
   sourceHint: string;
@@ -71,6 +71,36 @@ export const QUICK_TOOLS: QuickToolDefinition[] = [
     outputHint: 'Output PDF path for compressed file.',
     optionsHelp: 'Uses lossless object stream compression.',
     status: 'scaffolded'
+  },
+  {
+    id: 'password-protect-pdf',
+    section: 'security',
+    label: 'Password protect PDF',
+    description: 'Encrypt a PDF with an owner/user password policy for controlled access.',
+    sourceHint: 'Drop one source PDF file.',
+    outputHint: 'Output PDF path for encrypted document.',
+    optionsHelp: 'Implemented through a qpdf adapter when qpdf is installed in runtime. Use a strong password and verify with a second reader.',
+    status: 'implemented'
+  },
+  {
+    id: 'unlock-pdf',
+    section: 'security',
+    label: 'Unlock PDF',
+    description: 'Decrypt a password-protected PDF when you know the password.',
+    sourceHint: 'Drop one source PDF file.',
+    outputHint: 'Output PDF path for unlocked copy.',
+    optionsHelp: 'Requires the valid document password. This writes a decrypted PDF copy; handle output securely.',
+    status: 'implemented'
+  },
+  {
+    id: 'inspect-pdf-metadata',
+    section: 'security',
+    label: 'Inspect PDF metadata',
+    description: 'Export a basic metadata/security inspection report as JSON.',
+    sourceHint: 'Drop one source PDF file.',
+    outputHint: 'Output JSON report path.',
+    optionsHelp: 'Implemented for common PDF structures. Detection for advanced/obfuscated content remains best-effort.',
+    status: 'implemented'
   },
   {
     id: 'image-to-pdf',

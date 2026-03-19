@@ -44,6 +44,9 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
   const [includePageMarkers, setIncludePageMarkers] = useState(true);
   const [imageOutputFormat, setImageOutputFormat] = useState<'png' | 'jpeg'>('png');
   const [imageDpi, setImageDpi] = useState('144');
+  const [userPassword, setUserPassword] = useState('');
+  const [ownerPassword, setOwnerPassword] = useState('');
+  const [unlockPassword, setUnlockPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -54,8 +57,11 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
   const isPdfToText = tool.id === 'pdf-to-text';
   const isPdfToImages = tool.id === 'pdf-to-images';
   const isConversionTool = tool.section === 'conversions';
+  const isProtectTool = tool.id === 'password-protect-pdf';
+  const isUnlockTool = tool.id === 'unlock-pdf';
+  const isInspectMetadataTool = tool.id === 'inspect-pdf-metadata';
   const requiresSingleFile = !['merge-pdfs', 'image-to-pdf'].includes(tool.id);
-  const acceptedTypes = isOcrTool || isPdfToText || isPdfToImages || tool.id === 'pdf-to-word' || tool.id === 'pdf-to-excel'
+  const acceptedTypes = isOcrTool || isPdfToText || isPdfToImages || isProtectTool || isUnlockTool || isInspectMetadataTool || tool.id === 'pdf-to-word' || tool.id === 'pdf-to-excel'
     ? 'application/pdf'
     : isImageToPdf
       ? 'image/jpeg,image/jpg'
@@ -97,6 +103,17 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
         dpi: Number(imageDpi) || 144
       };
     }
+    if (tool.id === 'password-protect-pdf') {
+      return {
+        userPassword,
+        ownerPassword: ownerPassword || userPassword
+      };
+    }
+    if (tool.id === 'unlock-pdf') {
+      return {
+        password: unlockPassword
+      };
+    }
     return {};
   }, [
     degrees,
@@ -106,10 +123,13 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
     imageOutputFormat,
     imagePageFit,
     includePageMarkers,
+    ownerPassword,
     ocrLanguage,
     pagesValue,
     textOutputFormat,
-    tool.id
+    tool.id,
+    unlockPassword,
+    userPassword
   ]);
 
   function addFiles(list: FileList | null): void {
@@ -153,6 +173,14 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
 
     if (requiresPages && (options as { pages?: number[] }).pages?.length === 0) {
       setError('Please provide valid page numbers.');
+      return;
+    }
+    if (isProtectTool && !String((options as { userPassword?: string }).userPassword ?? '').trim()) {
+      setError('Provide a user password before running protection.');
+      return;
+    }
+    if (isUnlockTool && !String((options as { password?: string }).password ?? '').trim()) {
+      setError('Provide the current document password to unlock.');
       return;
     }
 
@@ -330,6 +358,58 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
               />
             </label>
           </>
+        ) : null}
+
+        {isProtectTool ? (
+          <>
+            <label className="block text-xs text-textSecondary">
+              User password (required)
+              <input
+                type="password"
+                value={userPassword}
+                onChange={(event) => setUserPassword(event.target.value)}
+                className="mt-1 w-full rounded border border-border bg-panelElevated px-2 py-1 text-sm text-textPrimary"
+                placeholder="Password to open document"
+              />
+            </label>
+            <label className="block text-xs text-textSecondary">
+              Owner password (optional)
+              <input
+                type="password"
+                value={ownerPassword}
+                onChange={(event) => setOwnerPassword(event.target.value)}
+                className="mt-1 w-full rounded border border-border bg-panelElevated px-2 py-1 text-sm text-textPrimary"
+                placeholder="Optional separate permissions password"
+              />
+            </label>
+            <p className="rounded border border-amber-300/40 bg-amber-500/10 p-2 text-[11px] text-amber-100">
+              Security note: this implements password-based PDF encryption. It does not provide legal/compliance policy enforcement by itself.
+            </p>
+          </>
+        ) : null}
+
+        {isUnlockTool ? (
+          <>
+            <label className="block text-xs text-textSecondary">
+              Current PDF password
+              <input
+                type="password"
+                value={unlockPassword}
+                onChange={(event) => setUnlockPassword(event.target.value)}
+                className="mt-1 w-full rounded border border-border bg-panelElevated px-2 py-1 text-sm text-textPrimary"
+                placeholder="Password used to open the PDF"
+              />
+            </label>
+            <p className="rounded border border-amber-300/40 bg-amber-500/10 p-2 text-[11px] text-amber-100">
+              Security note: unlocking writes an unencrypted copy. Store output only in protected locations.
+            </p>
+          </>
+        ) : null}
+
+        {isInspectMetadataTool ? (
+          <p className="rounded border border-cyan-300/40 bg-cyan-500/10 p-2 text-[11px] text-cyan-100">
+            Generates a JSON report with metadata, forms/annotations/javascript indicators, and embedded attachment hints.
+          </p>
         ) : null}
       </div>
 

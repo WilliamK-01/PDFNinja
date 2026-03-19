@@ -2,8 +2,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildViewerUrl, createDocumentFromFile } from '@/features/editor/document-open';
 import { runPageOperation } from '@/features/editor/page-operations-api';
 import { runOcrJob } from '@/features/editor/ocr-api';
+import { inspectDocumentSecurity } from '@/features/editor/security-api';
 import { useAppState } from '@/state/app-state';
-import type { AnnotationItem, AnnotationRect, AnnotationTool, OpenDocument, PageOperationRequest, PageOperationType } from '@/shared/types';
+import type {
+  AnnotationItem,
+  AnnotationRect,
+  AnnotationTool,
+  OpenDocument,
+  PageOperationRequest,
+  PageOperationType,
+  PdfSecurityReport,
+  RedactionDraft
+} from '@/shared/types';
 
 interface EditorScreenProps {
   documents: OpenDocument[];
@@ -24,6 +34,10 @@ function buildOutputPath(sourcePath: string, suffix: string): string {
 
 function makeId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function makeRedactionId(): string {
+  return makeId('red');
 }
 
 function normalizeRect(start: { x: number; y: number }, end: { x: number; y: number }): AnnotationRect {
@@ -69,6 +83,15 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [dragRect, setDragRect] = useState<AnnotationRect | null>(null);
   const [drawPoints, setDrawPoints] = useState<Array<{ x: number; y: number }>>([]);
+  const [securityReport, setSecurityReport] = useState<PdfSecurityReport | null>(null);
+  const [securityLoading, setSecurityLoading] = useState(false);
+  const [securityError, setSecurityError] = useState<string | null>(null);
+  const [redactions, setRedactions] = useState<RedactionDraft[]>([]);
+  const [redactionMode, setRedactionMode] = useState(false);
+  const [redactionTextHint, setRedactionTextHint] = useState('');
+  const [redactionNotes, setRedactionNotes] = useState('');
+  const [redactionDragStart, setRedactionDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [redactionDragRect, setRedactionDragRect] = useState<AnnotationRect | null>(null);
   const pickerRef = useRef<HTMLInputElement>(null);
   const viewerContainerRef = useRef<HTMLDivElement>(null);
 
@@ -90,6 +113,11 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
     setDragStart(null);
     setDragRect(null);
     setDrawPoints([]);
+    setSecurityReport(null);
+    setSecurityError(null);
+    setRedactions([]);
+    setRedactionDragStart(null);
+    setRedactionDragRect(null);
   }, [active?.id, active?.pageCount, active?.activePage, active?.path]);
 
   const effectivePageCount = active?.pageCount ?? 1;
@@ -374,6 +402,84 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
     viewerContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
+  async function runSecurityInspection(): Promise<void> {
+    if (!active) return;
+    setSecurityLoading(true);
+    setSecurityError(null);
+    try {
+      const report = await inspectDocumentSecurity(active.path);
+      setSecurityReport(report);
+    } catch (error) {
+      setSecurityError(error instanceof Error ? error.message : 'Security inspection failed');
+    } finally {
+      setSecurityLoading(false);
+    }
+  }
+
+  function addTextSelectionPlaceholder(): void {
+    if (!active) return;
+    const hint = redactionTextHint.trim();
+    if (!hint) return;
+    const now = new Date().toISOString();
+    setRedactions((current) => [
+      ...current,
+      {
+        id: makeRedactionId(),
+        page: active.activePage,
+        label: 'Text redaction placeholder',
+        source: 'text-selection-placeholder',
+        textHint: hint,
+        notes: redactionNotes.trim() || undefined,
+        status: 'draft',
+        createdAt: now,
+        updatedAt: now
+      }
+    ]);
+    setRedactionTextHint('');
+  }
+
+  function onRedactionPointerDown(event: React.PointerEvent<HTMLDivElement>): void {
+    if (!active || !redactionMode) return;
+    const point = getRelativePoint(event);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setRedactionDragStart(point);
+    setRedactionDragRect({ x: point.x, y: point.y, width: 0, height: 0 });
+  }
+
+  function onRedactionPointerMove(event: React.PointerEvent<HTMLDivElement>): void {
+    if (!redactionDragStart || !redactionMode) return;
+    const point = getRelativePoint(event);
+    setRedactionDragRect(normalizeRect(redactionDragStart, point));
+  }
+
+  function onRedactionPointerUp(event: React.PointerEvent<HTMLDivElement>): void {
+    if (!active || !redactionDragStart || !redactionMode) return;
+    const point = getRelativePoint(event);
+    const rect = normalizeRect(redactionDragStart, point);
+    if (rect.width > 0.005 && rect.height > 0.004) {
+      const now = new Date().toISOString();
+      setRedactions((current) => [
+        ...current,
+        {
+          id: makeRedactionId(),
+          page: active.activePage,
+          label: 'Manual redaction region',
+          source: 'manual-region',
+          rect,
+          notes: redactionNotes.trim() || undefined,
+          status: 'draft',
+          createdAt: now,
+          updatedAt: now
+        }
+      ]);
+    }
+    setRedactionDragStart(null);
+    setRedactionDragRect(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
   return (
     <section className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-panel">
       <input
@@ -460,6 +566,13 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
           ))}
         </div>
 
+        <button
+          onClick={() => setRedactionMode((prev) => !prev)}
+          className={`rounded border px-2 py-1 text-[11px] ${redactionMode ? 'border-red-300 bg-red-500/20 text-red-100' : 'border-border bg-panel text-textSecondary'}`}
+        >
+          {redactionMode ? 'Redaction placement: ON' : 'Redaction placement: OFF'}
+        </button>
+
         <label className="min-w-40 rounded border border-border bg-panel px-2 py-1 text-[11px] text-textSecondary">
           Annotation content
           <input
@@ -542,6 +655,21 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
                 onPointerMove={handleAnnotationPointerMove}
                 onPointerUp={handleAnnotationPointerUp}
               >
+                {redactions
+                  .filter((item) => item.page === (active?.activePage ?? 1) && item.rect)
+                  .map((item) => (
+                    <div
+                      key={item.id}
+                      className="absolute border border-red-300/80 bg-red-900/55"
+                      style={{
+                        left: `${(item.rect?.x ?? 0) * 100}%`,
+                        top: `${(item.rect?.y ?? 0) * 100}%`,
+                        width: `${(item.rect?.width ?? 0) * 100}%`,
+                        height: `${(item.rect?.height ?? 0) * 100}%`
+                      }}
+                      title={`${item.label} (${item.status})`}
+                    />
+                  ))}
                 {pageAnnotations.map((item) => {
                   const selected = state.selectedAnnotationId === item.id;
                   if (item.type === 'draw' && item.points?.length) {
@@ -614,6 +742,25 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
                       strokeWidth="2"
                     />
                   </svg>
+                ) : null}
+              </div>
+
+              <div
+                className={`absolute inset-2 rounded-lg ${redactionMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
+                onPointerDown={onRedactionPointerDown}
+                onPointerMove={onRedactionPointerMove}
+                onPointerUp={onRedactionPointerUp}
+              >
+                {redactionDragRect ? (
+                  <div
+                    className="absolute border border-red-300 bg-red-500/35"
+                    style={{
+                      left: `${redactionDragRect.x * 100}%`,
+                      top: `${redactionDragRect.y * 100}%`,
+                      width: `${redactionDragRect.width * 100}%`,
+                      height: `${redactionDragRect.height * 100}%`
+                    }}
+                  />
                 ) : null}
               </div>
             </div>
@@ -721,6 +868,129 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
                 Rotate
               </button>
             </div>
+          </div>
+
+          <h3 className="mt-6 text-sm font-semibold text-textPrimary">Document Security Inspector</h3>
+          <p className="mt-1 text-xs text-textSecondary">
+            Current checks are foundational and intended to surface common indicators. Treat as triage, not full compliance verification.
+          </p>
+          <button
+            onClick={() => void runSecurityInspection()}
+            disabled={!active || securityLoading}
+            className="mt-2 w-full rounded border border-accent/70 bg-accent/20 px-2 py-1 text-xs disabled:opacity-50"
+          >
+            {securityLoading ? 'Inspecting…' : 'Run security inspection'}
+          </button>
+          {securityError ? <p className="mt-2 text-xs text-red-300">{securityError}</p> : null}
+          {securityReport ? (
+            <div className="mt-2 rounded-lg border border-border bg-panel p-3 text-xs">
+              <p className="text-textPrimary">Encryption: {securityReport.isEncrypted ? 'Yes' : 'No'}</p>
+              <p className="text-textPrimary">Forms present: {securityReport.formsPresent ? 'Yes' : 'No'}</p>
+              <p className="text-textPrimary">Annotations present: {securityReport.annotationsPresent ? 'Yes' : 'No'}</p>
+              <p className="text-textPrimary">JavaScript indicator: {securityReport.javascriptPresent ? 'Detected' : 'Not detected'}</p>
+              <p className="mt-1 text-textPrimary">
+                Embedded attachments: {securityReport.embeddedAttachments.length > 0 ? securityReport.embeddedAttachments.length : 'None detected'}
+              </p>
+              {securityReport.embeddedAttachments.length > 0 ? (
+                <ul className="mt-1 list-disc pl-4 text-textSecondary">
+                  {securityReport.embeddedAttachments.map((item) => (
+                    <li key={`${item.name}-${item.sizeBytes ?? 0}`}>
+                      {item.name}
+                      {item.sizeBytes ? ` (${item.sizeBytes} bytes)` : ''}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <details className="mt-2">
+                <summary className="cursor-pointer text-textPrimary">Metadata entries ({securityReport.metadata.length})</summary>
+                <ul className="mt-1 space-y-1 text-textSecondary">
+                  {securityReport.metadata.map((entry) => (
+                    <li key={entry.key}>
+                      <span className="text-textPrimary">{entry.key}:</span> {entry.value}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+              <ul className="mt-2 space-y-1 text-amber-100">
+                {securityReport.inspectionWarnings.map((warning) => (
+                  <li key={warning}>⚠ {warning}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <h3 className="mt-6 text-sm font-semibold text-textPrimary">Redaction Review (Prototype)</h3>
+          <p className="mt-1 text-xs text-red-200">
+            Prototype warning: items below are review placeholders. They do not permanently remove underlying PDF content yet.
+          </p>
+          <label className="mt-2 block text-xs text-textSecondary">
+            Text hint for placeholder redaction
+            <input
+              value={redactionTextHint}
+              onChange={(event) => setRedactionTextHint(event.target.value)}
+              className="mt-1 w-full rounded border border-border bg-panelElevated px-2 py-1 text-xs text-textPrimary"
+              placeholder="e.g. SSN, Account Number"
+            />
+          </label>
+          <label className="mt-2 block text-xs text-textSecondary">
+            Reviewer notes
+            <input
+              value={redactionNotes}
+              onChange={(event) => setRedactionNotes(event.target.value)}
+              className="mt-1 w-full rounded border border-border bg-panelElevated px-2 py-1 text-xs text-textPrimary"
+              placeholder="Optional audit notes"
+            />
+          </label>
+          <button
+            onClick={addTextSelectionPlaceholder}
+            disabled={!active || !redactionTextHint.trim()}
+            className="mt-2 w-full rounded border border-border bg-panel px-2 py-1 text-xs disabled:opacity-50"
+          >
+            Add text redaction placeholder
+          </button>
+          <p className="mt-1 text-[11px] text-textSecondary">
+            For manual region placeholders, enable redaction placement and drag on the document viewport.
+          </p>
+          <div className="mt-2 space-y-2">
+            {redactions.length > 0 ? (
+              redactions
+                .slice()
+                .sort((a, b) => a.page - b.page || a.createdAt.localeCompare(b.createdAt))
+                .map((item) => (
+                  <div key={item.id} className="rounded border border-border bg-panel p-2 text-xs">
+                    <p className="text-textPrimary">
+                      {item.label} · page {item.page}
+                    </p>
+                    <p className="text-textSecondary">Source: {item.source}</p>
+                    {item.textHint ? <p className="text-textSecondary">Hint: {item.textHint}</p> : null}
+                    {item.notes ? <p className="text-textSecondary">Notes: {item.notes}</p> : null}
+                    <div className="mt-1 flex gap-2">
+                      <button
+                        onClick={() =>
+                          setRedactions((current) =>
+                            current.map((entry) =>
+                              entry.id === item.id ? { ...entry, status: 'reviewed', updatedAt: new Date().toISOString() } : entry
+                            )
+                          )
+                        }
+                        className="rounded border border-cyan-400/50 px-2 py-0.5 text-[11px]"
+                      >
+                        Mark reviewed
+                      </button>
+                      <button
+                        onClick={() => setRedactions((current) => current.filter((entry) => entry.id !== item.id))}
+                        className="rounded border border-red-400/50 px-2 py-0.5 text-[11px] text-red-200"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))
+            ) : (
+              <p className="rounded border border-dashed border-border p-2 text-xs text-textSecondary">
+                No redaction placeholders yet.
+              </p>
+            )}
           </div>
 
           <div className="mt-4 rounded-lg border border-border bg-panel p-3 text-xs">

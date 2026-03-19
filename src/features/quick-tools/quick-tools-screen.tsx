@@ -58,6 +58,7 @@ export function QuickToolsScreen(): JSX.Element {
         <div className="space-y-4">
           {[
             { key: 'pdf-core', label: 'PDF Core Tools' },
+            { key: 'security', label: 'Security & Redaction Foundations' },
             { key: 'conversions', label: 'Conversions' }
           ].map((section) => (
             <section key={section.key} className="space-y-2">

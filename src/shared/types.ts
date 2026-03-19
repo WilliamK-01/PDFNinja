@@ -54,6 +54,9 @@ export type QuickToolType =
   | 'remove-pages'
   | 'rotate-pages'
   | 'compress-pdf'
+  | 'password-protect-pdf'
+  | 'unlock-pdf'
+  | 'inspect-pdf-metadata'
   | 'image-to-pdf'
   | 'pdf-to-images'
   | 'pdf-to-text'
@@ -116,6 +119,40 @@ export interface AnnotationItem {
   selectionContext?: string;
   rect?: AnnotationRect;
   points?: AnnotationPoint[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SecurityMetadataEntry {
+  key: string;
+  value: string;
+}
+
+export interface AttachmentSummary {
+  name: string;
+  sizeBytes?: number;
+}
+
+export interface PdfSecurityReport {
+  sourcePath: string;
+  metadata: SecurityMetadataEntry[];
+  formsPresent: boolean;
+  annotationsPresent: boolean;
+  javascriptPresent: boolean;
+  embeddedAttachments: AttachmentSummary[];
+  isEncrypted: boolean;
+  inspectionWarnings: string[];
+}
+
+export interface RedactionDraft {
+  id: string;
+  page: number;
+  label: string;
+  status: 'draft' | 'reviewed' | 'applied-prototype';
+  source: 'manual-region' | 'text-selection-placeholder';
+  rect?: AnnotationRect;
+  textHint?: string;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }

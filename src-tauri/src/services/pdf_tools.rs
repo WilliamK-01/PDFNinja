@@ -1,8 +1,10 @@
 use std::path::Path;
+use std::{fs, path::PathBuf};
 
 use serde::Deserialize;
 
 use crate::services::conversion_service::ConversionService;
+use crate::services::security_service;
 use crate::shared_types::{
     PageOperationRequest, PageOperationType, QuickToolJobRequest, QuickToolType,
 };
@@ -42,6 +44,13 @@ pub fn run_tool(request: &QuickToolJobRequest) -> Result<PdfToolResult, PdfToolE
             &request.options,
         ),
         QuickToolType::CompressPdf => compress_pdf(&request.source_paths, &request.output_path),
+        QuickToolType::PasswordProtectPdf => {
+            password_protect_pdf(&request.source_paths, &request.output_path, &request.options)
+        }
+        QuickToolType::UnlockPdf => unlock_pdf(&request.source_paths, &request.output_path, &request.options),
+        QuickToolType::InspectPdfMetadata => {
+            inspect_pdf_metadata(&request.source_paths, &request.output_path)
+        }
         QuickToolType::ImageToPdf
         | QuickToolType::PdfToImages
         | QuickToolType::PdfToText
@@ -57,6 +66,46 @@ pub fn run_tool(request: &QuickToolJobRequest) -> Result<PdfToolResult, PdfToolE
             "OCR uses the dedicated ocr_service pipeline".to_string(),
         )),
     }
+}
+
+fn password_protect_pdf(
+    source_paths: &[String],
+    output_path: &str,
+    options: &serde_json::Value,
+) -> Result<PdfToolResult, PdfToolError> {
+    let source = require_single_source(source_paths, "Password protect PDF")?;
+    let message = security_service::protect_pdf(source, output_path, options)
+        .map_err(|error| PdfToolError::Validation(error.to_string()))?;
+    Ok(PdfToolResult { message })
+}
+
+fn unlock_pdf(
+    source_paths: &[String],
+    output_path: &str,
+    options: &serde_json::Value,
+) -> Result<PdfToolResult, PdfToolError> {
+    let source = require_single_source(source_paths, "Unlock PDF")?;
+    let message = security_service::unlock_pdf(source, output_path, options)
+        .map_err(|error| PdfToolError::Validation(error.to_string()))?;
+    Ok(PdfToolResult { message })
+}
+
+fn inspect_pdf_metadata(source_paths: &[String], output_path: &str) -> Result<PdfToolResult, PdfToolError> {
+    let source = require_single_source(source_paths, "Inspect metadata")?;
+    ensure_output_path(output_path)?;
+    let report = security_service::inspect_pdf(source)
+        .map_err(|error| PdfToolError::Validation(error.to_string()))?;
+    let serialized = serde_json::to_string_pretty(&report)
+        .map_err(|error| PdfToolError::Validation(error.to_string()))?;
+    if let Some(parent) = PathBuf::from(output_path).parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    fs::write(output_path, serialized)?;
+    Ok(PdfToolResult {
+        message: format!("Wrote PDF security report JSON to {output_path}"),
+    })
 }
 
 pub fn run_page_operation(request: &PageOperationRequest) -> Result<PdfToolResult, PdfToolError> {

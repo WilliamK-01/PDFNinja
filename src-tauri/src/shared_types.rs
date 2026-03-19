@@ -57,6 +57,9 @@ pub enum QuickToolType {
     RemovePages,
     RotatePages,
     CompressPdf,
+    PasswordProtectPdf,
+    UnlockPdf,
+    InspectPdfMetadata,
     ImageToPdf,
     PdfToImages,
     PdfToText,
@@ -64,6 +67,34 @@ pub enum QuickToolType {
     PdfToWord,
     PdfToExcel,
     OcrPdf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SecurityMetadataEntry {
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttachmentSummary {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size_bytes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PdfSecurityReport {
+    pub source_path: String,
+    pub metadata: Vec<SecurityMetadataEntry>,
+    pub forms_present: bool,
+    pub annotations_present: bool,
+    pub javascript_present: bool,
+    pub embedded_attachments: Vec<AttachmentSummary>,
+    pub is_encrypted: bool,
+    pub inspection_warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

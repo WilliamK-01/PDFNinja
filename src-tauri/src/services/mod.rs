@@ -4,4 +4,5 @@ pub mod ocr_service;
 pub mod page_operations_service;
 pub mod pdf_tools;
 pub mod quick_tools_service;
+pub mod security_service;
 pub mod settings_service;

@@ -2,13 +2,28 @@ export type AppRoute = 'home' | 'quick-tools' | 'editor' | 'automation' | 'setti
 
 export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
+export type DocumentSource = 'file-picker' | 'recent' | 'quick-tool';
+
+export interface DocumentMetadata {
+  byteSize?: number;
+  fileType?: string;
+  createdAt?: string;
+  modifiedAt?: string;
+  author?: string;
+  title?: string;
+  producer?: string;
+}
+
 export interface OpenDocument {
   id: string;
   name: string;
   path: string;
-  pageCount: number;
+  pageCount: number | null;
   activePage: number;
   modifiedAt: string;
+  source: DocumentSource;
+  sourceUrl?: string;
+  metadata?: DocumentMetadata;
 }
 
 export interface JobItem {

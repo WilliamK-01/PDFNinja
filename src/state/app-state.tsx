@@ -7,6 +7,7 @@ interface AppStateContextValue {
   setActiveTool: (tool: string | null) => void;
   openDocument: (doc: OpenDocument) => void;
   closeDocument: (id: string) => void;
+  updateDocument: (id: string, patch: Partial<OpenDocument>) => void;
   queueJob: (job: JobItem) => void;
   updateJob: (id: string, patch: Partial<JobItem>) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
@@ -17,6 +18,7 @@ type Action =
   | { type: 'SET_ACTIVE_TOOL'; payload: string | null }
   | { type: 'OPEN_DOCUMENT'; payload: OpenDocument }
   | { type: 'CLOSE_DOCUMENT'; payload: string }
+  | { type: 'UPDATE_DOCUMENT'; payload: { id: string; patch: Partial<OpenDocument> } }
   | { type: 'QUEUE_JOB'; payload: JobItem }
   | { type: 'UPDATE_JOB'; payload: { id: string; patch: Partial<JobItem> } }
   | { type: 'UPDATE_SETTINGS'; payload: Partial<AppSettings> };
@@ -47,7 +49,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'OPEN_DOCUMENT': {
       const existing = state.openDocuments.find((doc) => doc.id === action.payload.id);
       const openDocuments = existing
-        ? state.openDocuments.map((doc) => (doc.id === action.payload.id ? action.payload : doc))
+        ? state.openDocuments.map((doc) => (doc.id === action.payload.id ? { ...doc, ...action.payload } : doc))
         : [...state.openDocuments, action.payload];
 
       return {
@@ -63,6 +65,13 @@ function reducer(state: AppState, action: Action): AppState {
         state.activeDocumentId === action.payload ? openDocuments[0]?.id ?? null : state.activeDocumentId;
       return { ...state, openDocuments, activeDocumentId };
     }
+    case 'UPDATE_DOCUMENT':
+      return {
+        ...state,
+        openDocuments: state.openDocuments.map((doc) =>
+          doc.id === action.payload.id ? { ...doc, ...action.payload.patch } : doc
+        )
+      };
     case 'QUEUE_JOB':
       return { ...state, jobs: [...state.jobs, action.payload] };
     case 'UPDATE_JOB':
@@ -89,6 +98,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }): J
       setActiveTool: (tool) => dispatch({ type: 'SET_ACTIVE_TOOL', payload: tool }),
       openDocument: (doc) => dispatch({ type: 'OPEN_DOCUMENT', payload: doc }),
       closeDocument: (id) => dispatch({ type: 'CLOSE_DOCUMENT', payload: id }),
+      updateDocument: (id, patch) => dispatch({ type: 'UPDATE_DOCUMENT', payload: { id, patch } }),
       queueJob: (job) => dispatch({ type: 'QUEUE_JOB', payload: job }),
       updateJob: (id, patch) => dispatch({ type: 'UPDATE_JOB', payload: { id, patch } }),
       updateSettings: (patch) => dispatch({ type: 'UPDATE_SETTINGS', payload: patch })

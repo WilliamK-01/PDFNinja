@@ -11,6 +11,7 @@ interface QuickToolWorkflowProps {
   tool: QuickToolDefinition;
   recentResult: JobItem | null;
   onRun: (request: QuickToolJobRequest) => Promise<void>;
+  onOpenOutput?: (path: string) => void;
 }
 
 function parsePages(value: string): number[] {
@@ -30,7 +31,7 @@ function parsePages(value: string): number[] {
     .filter((page) => page > 0);
 }
 
-export function QuickToolWorkflow({ tool, recentResult, onRun }: QuickToolWorkflowProps): JSX.Element {
+export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: QuickToolWorkflowProps): JSX.Element {
   const [files, setFiles] = useState<SelectedFile[]>([]);
   const [outputPath, setOutputPath] = useState('');
   const [pagesValue, setPagesValue] = useState('1');
@@ -195,9 +196,19 @@ export function QuickToolWorkflow({ tool, recentResult, onRun }: QuickToolWorkfl
         <h4 className="font-medium text-textPrimary">Status & result</h4>
         {error ? <p className="mt-1 text-red-300">{error}</p> : null}
         {recentResult ? (
-          <p className="mt-1 text-textSecondary">
-            Last run: <span className="text-textPrimary">{recentResult.status}</span> — {recentResult.message ?? 'Completed'}
-          </p>
+          <div className="mt-1 space-y-2 text-textSecondary">
+            <p>
+              Last run: <span className="text-textPrimary">{recentResult.status}</span> — {recentResult.message ?? 'Completed'}
+            </p>
+            {recentResult.status === 'completed' && recentResult.outputPath.toLowerCase().endsWith('.pdf') ? (
+              <button
+                onClick={() => onOpenOutput?.(recentResult.outputPath)}
+                className="rounded-lg border border-accent/60 bg-accent/20 px-3 py-1 text-xs text-textPrimary hover:border-accent"
+              >
+                Open output in Editor
+              </button>
+            ) : null}
+          </div>
         ) : (
           <p className="mt-1 text-textSecondary">No runs yet.</p>
         )}

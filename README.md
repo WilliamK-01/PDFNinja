@@ -13,5 +13,16 @@ npm install
 npm run dev
 ```
 
+## OCR prerequisites (offline)
+
+The first OCR workflow uses native CLI dependencies that run locally (no cloud services):
+
+- `ocrmypdf`
+- `tesseract`
+- Tesseract language data (e.g. `eng`, `spa`)
+- Optional but recommended: `ghostscript`, `qpdf`, `pngquant` (pulled by `ocrmypdf` on most package managers)
+
+If `ocrmypdf` is not installed, OCR jobs fail with a dependency error in-app.
+
 ## Architecture
 See `docs/architecture.md`.

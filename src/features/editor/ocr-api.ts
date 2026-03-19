@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { JobItem, PageOperationRequest } from '@/shared/types';
+import type { JobItem, OcrJobRequest } from '@/shared/types';
 
 interface RustJobItem {
   id: string;
@@ -29,7 +29,7 @@ function mapRustJob(job: RustJobItem): JobItem {
   };
 }
 
-export async function runPageOperation(request: PageOperationRequest): Promise<JobItem> {
-  const job = await invoke<RustJobItem>('run_page_operation_job', { request });
+export async function runOcrJob(request: OcrJobRequest): Promise<JobItem> {
+  const job = await invoke<RustJobItem>('run_ocr_job', { request });
   return mapRustJob(job);
 }

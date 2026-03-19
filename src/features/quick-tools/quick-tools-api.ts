@@ -11,6 +11,7 @@ interface RustJobItem {
   updatedAt: string;
   progress: number;
   message?: string;
+  details?: Record<string, unknown>;
 }
 
 function mapRustJob(job: RustJobItem): JobItem {
@@ -23,7 +24,8 @@ function mapRustJob(job: RustJobItem): JobItem {
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
     progress: job.progress,
-    message: job.message
+    message: job.message,
+    details: job.details
   };
 }
 

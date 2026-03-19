@@ -18,9 +18,16 @@ export function JobsPanel({ jobs }: { jobs: JobItem[] }): JSX.Element {
                 <span className="font-medium text-textPrimary">{job.type}</span>
                 <span className="text-xs text-textSecondary">{job.status}</span>
               </div>
+              {job.message ? <p className="mt-1 text-xs text-textSecondary">{job.message}</p> : null}
               <div className="mt-1 h-1.5 rounded bg-border">
                 <div className="h-full rounded bg-accent" style={{ width: `${Math.max(job.progress, 6)}%` }} />
               </div>
+              {job.type.includes('ocr') && job.details ? (
+                <p className="mt-1 text-[11px] text-textSecondary">
+                  Pages: {String(job.details.pagesProcessed ?? 'n/a')} · Lang: {String(job.details.languageUsed ?? 'n/a')} · Confidence:{' '}
+                  {String(job.details.confidence ?? 'n/a')}
+                </p>
+              ) : null}
             </div>
           ))
         )}

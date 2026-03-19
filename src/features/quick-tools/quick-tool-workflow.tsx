@@ -36,11 +36,15 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
   const [outputPath, setOutputPath] = useState('');
   const [pagesValue, setPagesValue] = useState('1');
   const [degrees, setDegrees] = useState('90');
+  const [ocrLanguage, setOcrLanguage] = useState('eng');
+  const [deskew, setDeskew] = useState(true);
+  const [despeckle, setDespeckle] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
   const requiresPages = tool.id === 'extract-pages' || tool.id === 'remove-pages' || tool.id === 'rotate-pages';
   const requiresDegrees = tool.id === 'rotate-pages';
+  const isOcrTool = tool.id === 'ocr-pdf';
 
   const options = useMemo(() => {
     if (tool.id === 'extract-pages' || tool.id === 'remove-pages') {
@@ -49,8 +53,19 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
     if (tool.id === 'rotate-pages') {
       return { pages: parsePages(pagesValue), degrees: Number(degrees) || 90 };
     }
+    if (tool.id === 'ocr-pdf') {
+      return {
+        language: ocrLanguage,
+        preprocessing: {
+          deskew,
+          despeckle
+        },
+        languages: [ocrLanguage],
+        reviewUncertainText: false
+      };
+    }
     return {};
-  }, [degrees, pagesValue, tool.id]);
+  }, [degrees, deskew, despeckle, ocrLanguage, pagesValue, tool.id]);
 
   function addFiles(list: FileList | null): void {
     if (!list?.length) return;
@@ -80,6 +95,10 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
 
     if (!outputPath.trim()) {
       setError('Please provide an output destination path.');
+      return;
+    }
+    if (isOcrTool && files.length !== 1) {
+      setError('OCR currently supports exactly one source PDF per run.');
       return;
     }
 
@@ -129,6 +148,7 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
           multiple={tool.id === 'merge-pdfs' || tool.id === 'image-to-pdf'}
           onChange={(event) => addFiles(event.target.files)}
           className="mt-3 block text-xs text-textSecondary"
+          accept={isOcrTool ? 'application/pdf' : undefined}
         />
       </div>
 
@@ -166,6 +186,32 @@ export function QuickToolWorkflow({ tool, recentResult, onRun, onOpenOutput }: Q
               <option value="270">270°</option>
             </select>
           </label>
+        ) : null}
+
+        {isOcrTool ? (
+          <>
+            <label className="block text-xs text-textSecondary">
+              OCR language pack
+              <select
+                value={ocrLanguage}
+                onChange={(event) => setOcrLanguage(event.target.value)}
+                className="mt-1 w-full rounded border border-border bg-panelElevated px-2 py-1 text-sm text-textPrimary"
+              >
+                <option value="eng">English (eng)</option>
+                <option value="spa">Spanish (spa)</option>
+              </select>
+            </label>
+
+            <label className="flex items-center gap-2 text-xs text-textSecondary">
+              <input type="checkbox" checked={deskew} onChange={(event) => setDeskew(event.target.checked)} />
+              Deskew pages (hook enabled)
+            </label>
+
+            <label className="flex items-center gap-2 text-xs text-textSecondary">
+              <input type="checkbox" checked={despeckle} onChange={(event) => setDespeckle(event.target.checked)} />
+              Despeckle pages (hook enabled)
+            </label>
+          </>
         ) : null}
       </div>
 

@@ -57,3 +57,26 @@ pub enum QuickToolType {
     CompressPdf,
     ImageToPdf,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageOperationRequest {
+    pub operation: PageOperationType,
+    pub source_path: String,
+    pub output_path: String,
+    pub selected_pages: Vec<u32>,
+    #[serde(default)]
+    pub target_order: Option<Vec<u32>>,
+    #[serde(default)]
+    pub degrees: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum PageOperationType {
+    ReorderPages,
+    DeletePages,
+    DuplicatePages,
+    ExtractPages,
+    RotatePages,
+}

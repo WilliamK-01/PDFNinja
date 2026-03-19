@@ -62,6 +62,17 @@ export interface QuickToolJobRequest {
   options: Record<string, unknown>;
 }
 
+export type PageOperationType = 'reorder-pages' | 'delete-pages' | 'duplicate-pages' | 'extract-pages' | 'rotate-pages';
+
+export interface PageOperationRequest {
+  operation: PageOperationType;
+  sourcePath: string;
+  outputPath: string;
+  selectedPages: number[];
+  targetOrder?: number[];
+  degrees?: 90 | 180 | 270;
+}
+
 export interface AppState {
   route: AppRoute;
   openDocuments: OpenDocument[];

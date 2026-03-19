@@ -73,6 +73,34 @@ export interface PageOperationRequest {
   degrees?: 90 | 180 | 270;
 }
 
+export type AnnotationTool = 'select' | 'highlight' | 'underline' | 'strikeout' | 'note' | 'draw';
+export type AnnotationType = Exclude<AnnotationTool, 'select'>;
+
+export interface AnnotationRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface AnnotationPoint {
+  x: number;
+  y: number;
+}
+
+export interface AnnotationItem {
+  id: string;
+  documentId: string;
+  page: number;
+  type: AnnotationType;
+  content: string;
+  selectionContext?: string;
+  rect?: AnnotationRect;
+  points?: AnnotationPoint[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppState {
   route: AppRoute;
   openDocuments: OpenDocument[];
@@ -80,4 +108,6 @@ export interface AppState {
   activeTool: string | null;
   jobs: JobItem[];
   settings: AppSettings;
+  sessionAnnotations: Record<string, AnnotationItem[]>;
+  selectedAnnotationId: string | null;
 }

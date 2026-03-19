@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo, useReducer } from 'react';
-import type { AppRoute, AppSettings, AppState, JobItem, OpenDocument } from '@/shared/types';
+import type { AnnotationItem, AppRoute, AppSettings, AppState, JobItem, OpenDocument } from '@/shared/types';
 
 interface AppStateContextValue {
   state: AppState;
@@ -11,6 +11,10 @@ interface AppStateContextValue {
   queueJob: (job: JobItem) => void;
   updateJob: (id: string, patch: Partial<JobItem>) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
+  addAnnotation: (annotation: AnnotationItem) => void;
+  updateAnnotation: (id: string, documentId: string, patch: Partial<AnnotationItem>) => void;
+  deleteAnnotation: (id: string, documentId: string) => void;
+  selectAnnotation: (id: string | null) => void;
 }
 
 type Action =
@@ -21,7 +25,11 @@ type Action =
   | { type: 'UPDATE_DOCUMENT'; payload: { id: string; patch: Partial<OpenDocument> } }
   | { type: 'QUEUE_JOB'; payload: JobItem }
   | { type: 'UPDATE_JOB'; payload: { id: string; patch: Partial<JobItem> } }
-  | { type: 'UPDATE_SETTINGS'; payload: Partial<AppSettings> };
+  | { type: 'UPDATE_SETTINGS'; payload: Partial<AppSettings> }
+  | { type: 'ADD_ANNOTATION'; payload: AnnotationItem }
+  | { type: 'UPDATE_ANNOTATION'; payload: { id: string; documentId: string; patch: Partial<AnnotationItem> } }
+  | { type: 'DELETE_ANNOTATION'; payload: { id: string; documentId: string } }
+  | { type: 'SELECT_ANNOTATION'; payload: string | null };
 
 const initialState: AppState = {
   route: 'home',
@@ -35,7 +43,9 @@ const initialState: AppState = {
     autosaveMinutes: 3,
     recentLimit: 15,
     scratchDirectory: ''
-  }
+  },
+  sessionAnnotations: {},
+  selectedAnnotationId: null
 };
 
 const AppStateContext = createContext<AppStateContextValue | undefined>(undefined);
@@ -83,6 +93,44 @@ function reducer(state: AppState, action: Action): AppState {
       };
     case 'UPDATE_SETTINGS':
       return { ...state, settings: { ...state.settings, ...action.payload } };
+
+    case 'ADD_ANNOTATION': {
+      const current = state.sessionAnnotations[action.payload.documentId] ?? [];
+      return {
+        ...state,
+        sessionAnnotations: {
+          ...state.sessionAnnotations,
+          [action.payload.documentId]: [...current, action.payload]
+        },
+        selectedAnnotationId: action.payload.id
+      };
+    }
+    case 'UPDATE_ANNOTATION': {
+      const current = state.sessionAnnotations[action.payload.documentId] ?? [];
+      return {
+        ...state,
+        sessionAnnotations: {
+          ...state.sessionAnnotations,
+          [action.payload.documentId]: current.map((item) =>
+            item.id === action.payload.id ? { ...item, ...action.payload.patch, updatedAt: new Date().toISOString() } : item
+          )
+        }
+      };
+    }
+    case 'DELETE_ANNOTATION': {
+      const current = state.sessionAnnotations[action.payload.documentId] ?? [];
+      return {
+        ...state,
+        sessionAnnotations: {
+          ...state.sessionAnnotations,
+          [action.payload.documentId]: current.filter((item) => item.id !== action.payload.id)
+        },
+        selectedAnnotationId: state.selectedAnnotationId === action.payload.id ? null : state.selectedAnnotationId
+      };
+    }
+    case 'SELECT_ANNOTATION':
+      return { ...state, selectedAnnotationId: action.payload };
+
     default:
       return state;
   }
@@ -101,7 +149,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }): J
       updateDocument: (id, patch) => dispatch({ type: 'UPDATE_DOCUMENT', payload: { id, patch } }),
       queueJob: (job) => dispatch({ type: 'QUEUE_JOB', payload: job }),
       updateJob: (id, patch) => dispatch({ type: 'UPDATE_JOB', payload: { id, patch } }),
-      updateSettings: (patch) => dispatch({ type: 'UPDATE_SETTINGS', payload: patch })
+      updateSettings: (patch) => dispatch({ type: 'UPDATE_SETTINGS', payload: patch }),
+      addAnnotation: (annotation) => dispatch({ type: 'ADD_ANNOTATION', payload: annotation }),
+      updateAnnotation: (id, documentId, patch) => dispatch({ type: 'UPDATE_ANNOTATION', payload: { id, documentId, patch } }),
+      deleteAnnotation: (id, documentId) => dispatch({ type: 'DELETE_ANNOTATION', payload: { id, documentId } }),
+      selectAnnotation: (id) => dispatch({ type: 'SELECT_ANNOTATION', payload: id })
     }),
     [state]
   );

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildViewerUrl, createDocumentFromFile } from '@/features/editor/document-open';
 import { runPageOperation } from '@/features/editor/page-operations-api';
 import { useAppState } from '@/state/app-state';
-import type { OpenDocument, PageOperationRequest, PageOperationType } from '@/shared/types';
+import type { AnnotationItem, AnnotationRect, AnnotationTool, OpenDocument, PageOperationRequest, PageOperationType } from '@/shared/types';
 
 interface EditorScreenProps {
   documents: OpenDocument[];
@@ -21,8 +21,30 @@ function buildOutputPath(sourcePath: string, suffix: string): string {
   return sourcePath.replace(/\.pdf$/i, `-${suffix}.pdf`);
 }
 
+function makeId(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function normalizeRect(start: { x: number; y: number }, end: { x: number; y: number }): AnnotationRect {
+  return {
+    x: Math.min(start.x, end.x),
+    y: Math.min(start.y, end.y),
+    width: Math.abs(end.x - start.x),
+    height: Math.abs(end.y - start.y)
+  };
+}
+
+const ANNOTATION_TOOLS: Array<{ tool: AnnotationTool; label: string }> = [
+  { tool: 'select', label: 'Select' },
+  { tool: 'highlight', label: 'Highlight' },
+  { tool: 'underline', label: 'Underline' },
+  { tool: 'strikeout', label: 'Strikeout' },
+  { tool: 'note', label: 'Note' },
+  { tool: 'draw', label: 'Draw' }
+];
+
 export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps): JSX.Element {
-  const { openDocument, queueJob, updateDocument, updateJob } = useAppState();
+  const { openDocument, queueJob, updateDocument, updateJob, state, addAnnotation, deleteAnnotation, selectAnnotation } = useAppState();
   const [zoom, setZoom] = useState(100);
   const [fitMode, setFitMode] = useState<FitMode>('width');
   const [pageInput, setPageInput] = useState('1');
@@ -36,9 +58,17 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
   const [extractOutputPath, setExtractOutputPath] = useState('');
   const [operationBusy, setOperationBusy] = useState(false);
   const [thumbScrollTop, setThumbScrollTop] = useState(0);
+  const [annotationTool, setAnnotationTool] = useState<AnnotationTool>('select');
+  const [annotationContent, setAnnotationContent] = useState('');
+  const [selectionContextInput, setSelectionContextInput] = useState('');
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [dragRect, setDragRect] = useState<AnnotationRect | null>(null);
+  const [drawPoints, setDrawPoints] = useState<Array<{ x: number; y: number }>>([]);
   const pickerRef = useRef<HTMLInputElement>(null);
+  const viewerContainerRef = useRef<HTMLDivElement>(null);
 
   const active = useMemo(() => documents.find((doc) => doc.id === activeDocumentId) ?? null, [activeDocumentId, documents]);
+  const annotations = active ? state.sessionAnnotations[active.id] ?? [] : [];
 
   useEffect(() => {
     setPageInput(String(active?.activePage ?? 1));
@@ -51,6 +81,9 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
     setSelectedPages([active?.activePage ?? 1]);
     setLastSelectedPage(active?.activePage ?? 1);
     setExtractOutputPath(active ? buildOutputPath(active.path, 'extract') : '');
+    setDragStart(null);
+    setDragRect(null);
+    setDrawPoints([]);
   }, [active?.id, active?.pageCount, active?.activePage, active?.path]);
 
   const effectivePageCount = active?.pageCount ?? 1;
@@ -197,6 +230,103 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
   const topSpacer = startIndex * THUMB_HEIGHT;
   const bottomSpacer = Math.max(0, (orderedPages.length - endIndex) * THUMB_HEIGHT);
 
+  const pageAnnotations = annotations.filter((item) => item.page === (active?.activePage ?? 1));
+
+  function getRelativePoint(event: React.PointerEvent<HTMLDivElement>): { x: number; y: number } {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return {
+      x: (event.clientX - bounds.left) / bounds.width,
+      y: (event.clientY - bounds.top) / bounds.height
+    };
+  }
+
+  function handleAnnotationPointerDown(event: React.PointerEvent<HTMLDivElement>): void {
+    if (!active || annotationTool === 'select') return;
+    const point = getRelativePoint(event);
+
+    if (annotationTool === 'note') {
+      addAnnotation({
+        id: makeId('ann'),
+        documentId: active.id,
+        page: active.activePage,
+        type: 'note',
+        content: annotationContent.trim() || 'Sticky note',
+        selectionContext: selectionContextInput.trim() || undefined,
+        rect: { x: point.x, y: point.y, width: 0.04, height: 0.05 },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      return;
+    }
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragStart(point);
+    if (annotationTool === 'draw') {
+      setDrawPoints([point]);
+    } else {
+      setDragRect({ x: point.x, y: point.y, width: 0, height: 0 });
+    }
+  }
+
+  function handleAnnotationPointerMove(event: React.PointerEvent<HTMLDivElement>): void {
+    if (!dragStart || !active || annotationTool === 'select' || annotationTool === 'note') return;
+    const point = getRelativePoint(event);
+    if (annotationTool === 'draw') {
+      setDrawPoints((prev) => [...prev, point]);
+      return;
+    }
+    setDragRect(normalizeRect(dragStart, point));
+  }
+
+  function handleAnnotationPointerUp(event: React.PointerEvent<HTMLDivElement>): void {
+    if (!dragStart || !active || annotationTool === 'select' || annotationTool === 'note') return;
+    const point = getRelativePoint(event);
+
+    if (annotationTool === 'draw') {
+      if (drawPoints.length > 1) {
+        addAnnotation({
+          id: makeId('ann'),
+          documentId: active.id,
+          page: active.activePage,
+          type: 'draw',
+          content: annotationContent.trim() || 'Freehand drawing',
+          selectionContext: selectionContextInput.trim() || undefined,
+          points: [...drawPoints, point],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+      setDrawPoints([]);
+    } else {
+      const rect = normalizeRect(dragStart, point);
+      if (rect.width > 0.005 && rect.height > 0.004) {
+        addAnnotation({
+          id: makeId('ann'),
+          documentId: active.id,
+          page: active.activePage,
+          type: annotationTool,
+          content: annotationContent.trim() || `${annotationTool} annotation`,
+          selectionContext: selectionContextInput.trim() || undefined,
+          rect,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+      setDragRect(null);
+    }
+
+    setDragStart(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function focusAnnotation(annotation: AnnotationItem): void {
+    goToPage(annotation.page);
+    selectAnnotation(annotation.id);
+    viewerContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   return (
     <section className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-panel">
       <input
@@ -271,6 +401,38 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
           ↻
         </button>
 
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-panel px-1 py-1">
+          {ANNOTATION_TOOLS.map(({ tool, label }) => (
+            <button
+              key={tool}
+              onClick={() => setAnnotationTool(tool)}
+              className={`rounded px-2 py-1 text-[11px] ${annotationTool === tool ? 'bg-accent/30 text-textPrimary' : 'text-textSecondary hover:bg-panelElevated'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <label className="min-w-40 rounded border border-border bg-panel px-2 py-1 text-[11px] text-textSecondary">
+          Annotation content
+          <input
+            value={annotationContent}
+            onChange={(event) => setAnnotationContent(event.target.value)}
+            placeholder="Optional comment..."
+            className="mt-1 w-full border-none bg-transparent text-textPrimary outline-none"
+          />
+        </label>
+
+        <label className="min-w-40 rounded border border-border bg-panel px-2 py-1 text-[11px] text-textSecondary">
+          Selection context
+          <input
+            value={selectionContextInput}
+            onChange={(event) => setSelectionContextInput(event.target.value)}
+            placeholder="Optional source text"
+            className="mt-1 w-full border-none bg-transparent text-textPrimary outline-none"
+          />
+        </label>
+
         <label className="ml-auto flex min-w-56 items-center gap-2 rounded border border-border bg-panel px-2 py-1 text-xs text-textSecondary">
           Search
           <input
@@ -282,7 +444,7 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
         </label>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr_320px]">
+      <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr_360px]">
         <aside className="overflow-hidden border-r border-border bg-panelElevated/40 p-2">
           <div className="px-2 py-1">
             <h3 className="text-xs uppercase tracking-wide text-textSecondary">{organizerMode ? 'Page organizer' : 'Thumbnails'}</h3>
@@ -320,13 +482,93 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
 
         <main className="min-h-0 overflow-auto bg-background p-4">
           {active && viewerSrc ? (
-            <div className="mx-auto max-w-5xl rounded-xl border border-border bg-panel p-2 shadow-soft">
+            <div ref={viewerContainerRef} className="relative mx-auto max-w-5xl rounded-xl border border-border bg-panel p-2 shadow-soft">
               <iframe
                 title={active.name}
                 src={viewerSrc}
                 className="h-[76vh] w-full rounded-lg border border-border bg-white"
                 style={{ transform: `rotate(${rotation}deg)` }}
               />
+              <div
+                className={`absolute inset-2 rounded-lg ${annotationTool === 'select' ? 'pointer-events-none' : 'pointer-events-auto'}`}
+                onPointerDown={handleAnnotationPointerDown}
+                onPointerMove={handleAnnotationPointerMove}
+                onPointerUp={handleAnnotationPointerUp}
+              >
+                {pageAnnotations.map((item) => {
+                  const selected = state.selectedAnnotationId === item.id;
+                  if (item.type === 'draw' && item.points?.length) {
+                    return (
+                      <svg key={item.id} className="pointer-events-none absolute inset-0 h-full w-full">
+                        <polyline
+                          points={item.points.map((p) => `${p.x * 100}%,${p.y * 100}%`).join(' ')}
+                          fill="none"
+                          stroke={selected ? '#22d3ee' : '#f43f5e'}
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    );
+                  }
+
+                  if (!item.rect) return null;
+                  const base = {
+                    left: `${item.rect.x * 100}%`,
+                    top: `${item.rect.y * 100}%`,
+                    width: `${item.rect.width * 100}%`,
+                    height: `${item.rect.height * 100}%`
+                  };
+
+                  if (item.type === 'highlight') {
+                    return <div key={item.id} className={`absolute bg-yellow-300/45 ${selected ? 'ring-2 ring-cyan-300' : ''}`} style={base} />;
+                  }
+                  if (item.type === 'underline') {
+                    return <div key={item.id} className={`absolute border-b-[3px] border-yellow-300 ${selected ? 'ring-2 ring-cyan-300' : ''}`} style={base} />;
+                  }
+                  if (item.type === 'strikeout') {
+                    return (
+                      <div key={item.id} className={`absolute ${selected ? 'ring-2 ring-cyan-300' : ''}`} style={base}>
+                        <div className="absolute left-0 top-1/2 h-[3px] w-full -translate-y-1/2 bg-red-400" />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div
+                      key={item.id}
+                      className={`absolute flex h-5 w-5 items-center justify-center rounded-full border border-amber-200 bg-amber-400 text-[10px] text-black ${
+                        selected ? 'ring-2 ring-cyan-300' : ''
+                      }`}
+                      style={{ left: `${item.rect.x * 100}%`, top: `${item.rect.y * 100}%` }}
+                      title={item.content}
+                    >
+                      ✎
+                    </div>
+                  );
+                })}
+
+                {dragRect && annotationTool !== 'draw' ? (
+                  <div
+                    className="absolute border border-cyan-300/80 bg-cyan-300/20"
+                    style={{
+                      left: `${dragRect.x * 100}%`,
+                      top: `${dragRect.y * 100}%`,
+                      width: `${dragRect.width * 100}%`,
+                      height: `${dragRect.height * 100}%`
+                    }}
+                  />
+                ) : null}
+
+                {annotationTool === 'draw' && drawPoints.length > 1 ? (
+                  <svg className="pointer-events-none absolute inset-0 h-full w-full">
+                    <polyline
+                      points={drawPoints.map((p) => `${p.x * 100}%,${p.y * 100}%`).join(' ')}
+                      fill="none"
+                      stroke="#22d3ee"
+                      strokeWidth="2"
+                    />
+                  </svg>
+                ) : null}
+              </div>
             </div>
           ) : (
             <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border bg-panelElevated/40 p-6 text-sm text-textSecondary">
@@ -336,7 +578,42 @@ export function EditorScreen({ documents, activeDocumentId }: EditorScreenProps)
         </main>
 
         <aside className="overflow-auto border-l border-border bg-panelElevated/40 p-4">
-          <h3 className="text-sm font-semibold text-textPrimary">Page Actions</h3>
+          <h3 className="text-sm font-semibold text-textPrimary">Annotations & Comments</h3>
+          <p className="mt-1 text-xs text-textSecondary">Session layer only for now. Export/save into PDF is not implemented yet.</p>
+
+          <div className="mt-3 space-y-2">
+            {active && annotations.length > 0 ? (
+              annotations
+                .slice()
+                .sort((a, b) => a.page - b.page || a.createdAt.localeCompare(b.createdAt))
+                .map((item) => (
+                  <div
+                    key={item.id}
+                    className={`rounded-lg border p-2 text-xs ${state.selectedAnnotationId === item.id ? 'border-cyan-300 bg-cyan-400/10' : 'border-border bg-panel'}`}
+                  >
+                    <button onClick={() => focusAnnotation(item)} className="w-full text-left">
+                      <p className="font-medium text-textPrimary">
+                        {item.type} · page {item.page}
+                      </p>
+                      <p className="mt-1 text-textSecondary">{item.content || 'No comment text'}</p>
+                      {item.selectionContext ? <p className="mt-1 italic text-textSecondary">“{item.selectionContext}”</p> : null}
+                    </button>
+                    <button
+                      onClick={() => active && deleteAnnotation(item.id, active.id)}
+                      className="mt-2 rounded border border-red-300/60 px-2 py-1 text-[11px] text-red-200"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))
+            ) : (
+              <p className="rounded border border-dashed border-border p-2 text-xs text-textSecondary">
+                No annotations yet. Pick a tool and mark the page.
+              </p>
+            )}
+          </div>
+
+          <h3 className="mt-6 text-sm font-semibold text-textPrimary">Page Actions</h3>
           <p className="mt-1 text-xs text-textSecondary">{selectedPages.length} selected · {effectivePageCount} total pages</p>
 
           <div className="mt-3 grid grid-cols-2 gap-2">

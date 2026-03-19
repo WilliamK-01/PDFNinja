@@ -2,7 +2,9 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::shared_types::{QuickToolJobRequest, QuickToolType};
+use crate::shared_types::{
+    PageOperationRequest, PageOperationType, QuickToolJobRequest, QuickToolType,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum PdfToolError {
@@ -40,6 +42,56 @@ pub fn run_tool(request: &QuickToolJobRequest) -> Result<PdfToolResult, PdfToolE
         ),
         QuickToolType::CompressPdf => compress_pdf(&request.source_paths, &request.output_path),
         QuickToolType::ImageToPdf => image_to_pdf(&request.source_paths, &request.output_path),
+    }
+}
+
+pub fn run_page_operation(request: &PageOperationRequest) -> Result<PdfToolResult, PdfToolError> {
+    let source_paths = vec![request.source_path.clone()];
+
+    match request.operation {
+        PageOperationType::DeletePages => {
+            let options = serde_json::json!({ "pages": request.selected_pages });
+            remove_pages(&source_paths, &request.output_path, &options)
+        }
+        PageOperationType::ExtractPages => {
+            let options = serde_json::json!({ "pages": request.selected_pages });
+            extract_pages(&source_paths, &request.output_path, &options)
+        }
+        PageOperationType::RotatePages => {
+            let degrees = request.degrees.ok_or_else(|| {
+                PdfToolError::Validation("Rotate pages requires `degrees`".to_string())
+            })?;
+            let options =
+                serde_json::json!({ "pages": request.selected_pages, "degrees": degrees });
+            rotate_pages(&source_paths, &request.output_path, &options)
+        }
+        PageOperationType::ReorderPages => {
+            require_single_source(&source_paths, "Reorder pages")?;
+            ensure_output_path(&request.output_path)?;
+            let target_order = request.target_order.as_ref().ok_or_else(|| {
+                PdfToolError::Validation("Reorder pages requires `targetOrder`".to_string())
+            })?;
+            if target_order.is_empty() {
+                return Err(PdfToolError::Validation(
+                    "Reorder pages requires a non-empty target order".to_string(),
+                ));
+            }
+            Err(PdfToolError::NotImplemented(
+                "TODO(pdf-core): integrate page reorder backend".to_string(),
+            ))
+        }
+        PageOperationType::DuplicatePages => {
+            require_single_source(&source_paths, "Duplicate pages")?;
+            ensure_output_path(&request.output_path)?;
+            if request.selected_pages.is_empty() {
+                return Err(PdfToolError::Validation(
+                    "Provide at least one page to duplicate".to_string(),
+                ));
+            }
+            Err(PdfToolError::NotImplemented(
+                "TODO(pdf-core): integrate page duplication backend".to_string(),
+            ))
+        }
     }
 }
 
